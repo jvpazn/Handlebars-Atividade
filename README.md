@@ -1,2 +1,3 @@
 # Handlebars-Atividade
-Por enquanto, desatualizada
+
+Finalizado
