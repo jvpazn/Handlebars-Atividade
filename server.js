@@ -1,6 +1,9 @@
 const express = require('express');
 const exphbs = require('express-handlebars');
 
+const pessoa = require('./models/pessoa.model')
+const db = require('./config/database')
+
 const app = express();
 const port = 3000;
 
@@ -10,87 +13,99 @@ app.use(express.urlencoded({extended: true}));
 app.engine('handlebars', exphbs.engine({defaultLayout: false}));
 app.set('view engine', 'handlebars');
 
-let pessoas = [
-    { id: 1, nome: 'Pessoa 1'},
-    { id: 2, nome: 'Pessoa 2'},
-    { id: 3, nome: 'Pessoa 3'}
-]
-
 app.get('/', (req,res) => {res.render('home')});
 
-app.get('/pessoas', (req,res) =>{
-    res.render('listarPessoas', {pessoas})
+app.get('/pessoas', async (req,res) =>{
+    try{
+        let pessoas = await pessoa.findAll({raw: true}); 
+
+        res.render('listarPessoas', { pessoas })
+    } catch (error) {
+        console.error('Erro ao buscar pessoas:', error);
+        res.status(500).send('Erro ao Buscar Pessoas! :3')
+    }
 }); 
 
 app.get('/pessoas/nova', (req,res) => res.render('cadastrarPessoa')); 
 
-app.get('/pessoas/:id', (req,res) =>{
-    const id = parseInt(req.params.id);
-    const pessoa = pessoas.find(p => p.id === id);
+app.get('/pessoas/:id', async(req,res) =>{
+    try{
+        const pessoaDetalhar = await pessoa.findByPk(req.params.id ,{raw: true});
 
-    if (pessoa) {
-        res.render('detalharPessoa', { pessoa })
-    } else {
-        res.status(404).send('Pessoa Não Encontrada');
+        res.render('detalharPessoa', {pessoa : pessoaDetalhar});
+    } catch (error) {
+        console.error('Erro ao buscar pessoa:', error);
+        res.status(500).send('Erro ao buscar Pessoa! :3')
     }
 
 });
 
-app.post('/pessoas', (req,res) =>{
-    const nome = req.body.nome;
-
-    const novaPessoa = {
-        id: pessoas.length +1,
-        nome
-
-    };
-
-    pessoas.push(novaPessoa);
+app.post('/pessoas', async (req,res) =>{
+        try{
+        await pessoa.create({
+            nome: req.body.nome
+        });
+        
+        res.redirect('/pessoas');
+    } catch (error) {
+        console.error('Erro ao cadastrar pessoa:', error);
+        res.status(500).send('Erro ao cadastrar Pessoa! :3')
+    }
 
     res.render('listarPessoas', {pessoas})
 }); 
 
-app.get('/pessoas/ver/:id', (req, res) =>{
-    const id = parseInt(req.params.id);
-    const pessoa = pessoas.find(p => p.id === id);
+app.get('/pessoas/:id/editar', async (req, res) =>{
+    try{
+        const pessoaEditar = await pessoa.findByPk(req.params.id ,{raw: true});
+        
+        res.render('editarPessoa', { pessoa : pessoaEditar})
 
-    if (!pessoa) return res.status(404).send('Pessoa Não Encontrada');
-
-    res.render('detalharPessoa', {pessoa})
-
+    } catch (error) {
+        console.error('Erro ao buscar pessoa:', error);
+        res.status(500).send('Erro ao buscar Pessoa! :3')
+    }
 });
 
-app.get('/pessoas/:id/editar', (req, res) =>{
-    const id = parseInt(req.params.id);
-    const pessoa = pessoas.find(p => p.id === id);
+app.post('/pessoas/:id', async (req, res) => {
+    try{
+        let pessoaAtualizar = await pessoa.findByPk(req.params.id);
+        
+        pessoaAtualizar.nome = req.body.nome;
 
-    if (!pessoa) return res.status(404).send('Pessoa Não Encontrada');
-    
-    res.render('editarPessoa', { pessoa } );
+        await pessoaAtualizar.save()
+
+        res.redirect('/pessoas')
+
+    } catch (error) {
+        console.error('Erro ao atualizar pessoa:', error);
+        res.status(500).send('Erro ao atualizar Pessoa! :3')
+    }
 });
 
-app.post('/pessoas/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const pessoa = pessoas.find(p => p.id === id);
+app.post('/pessoas/excluir/:id', async (req, res) => {
+    try{
+        let pessoaExcluir = await pessoa.findByPk(req.params.id);
 
-  if (!pessoa) return res.status(404).send('Pessoa não encontrada');
+        await pessoaExcluir.destroy()
 
-  pessoa.nome = req.body.nome;
-  res.render('listarPessoas', { pessoas });
+        res.redirect('/pessoas')
+
+    } catch (error) {
+        console.error('Erro ao DELETAR pessoa:', error);
+        res.status(500).send('Erro ao DELETAR Pessoa! >:3')
+    }
 });
+ 
+db.sync()
+.then(() => {
+    console.log('Banco de dados sincronizado.');
+})
+.catch((e) =>{
+    console.error('Erro ao sincronizar o banco de dados:', e);
+});
+
 
 app.listen(port, () => {
     console.log(`Servidor em execução: http://localhost:${port}`);
 })
-
-app.post('/pessoas/excluir/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const index = pessoas.findIndex(p => p.id === id);
-
-    if (index === -1) 
-        return res.status(404).send('Pessoa não encontrada');
-
-    pessoas.splice(index, 1);
-    res.redirect('/pessoas');
-});
- 
